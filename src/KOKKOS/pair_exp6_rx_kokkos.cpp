@@ -284,7 +284,7 @@ void PairExp6rxKokkos<DeviceType>::operator()(TagPairExp6rxCompute<NEIGHFLAG,NEW
   Kokkos::View<E_FLOAT*, typename DAT::t_efloat_1d::array_layout,DeviceType,Kokkos::MemoryTraits<AtomicF<NEIGHFLAG>::value> > a_uCG = uCG;
   Kokkos::View<E_FLOAT*, typename DAT::t_efloat_1d::array_layout,DeviceType,Kokkos::MemoryTraits<AtomicF<NEIGHFLAG>::value> > a_uCGnew = uCGnew;
 
-  int i,j,jj,jnum,itype,jtype;
+  int i,jj,jnum,itype,jtype;
   double xtmp,ytmp,ztmp,delx,dely,delz,evdwl,evdwlOld,fpair;
   double rsq,r2inv,r6inv,forceExp6,factor_lj;
   double rCut,rCutInv,rCut2inv,rCut6inv,rCutExp,urc,durc;
@@ -310,6 +310,9 @@ void PairExp6rxKokkos<DeviceType>::operator()(TagPairExp6rxCompute<NEIGHFLAG,NEW
   double mixWtSite2old_i, mixWtSite2old_j;
   double mixWtSite1_i, mixWtSite1_j;
   double mixWtSite2_i, mixWtSite2_j;
+
+  fpairOldEXP6_12 = 0.0;
+  fpairOldEXP6_21 = 0.0;
 
   const int nRep = 12;
   const double shift = 1.05;
@@ -508,7 +511,7 @@ void PairExp6rxKokkos<DeviceType>::operator()(TagPairExp6rxCompute<NEIGHFLAG,NEW
 
       if(rm12_ij!=0.0 && rm21_ij!=0.0){
         if(alpha21_ij == 6.0 || alpha12_ij == 6.0)
-          error->all(FLERR,"alpha_ij is 6.0 in pair exp6");
+          k_error_flag.d_view() = 1;
 
         // A3.  Compute some convenient quantities for evaluating the force
         rminv = 1.0/rm12_ij;
@@ -659,6 +662,10 @@ void PairExp6rxKokkos<DeviceType>::coeff(int narg, char **arg)
       s_coeffEps[i] = coeffEps[i];
       s_coeffRm[i] = coeffRm[i];
     }
+
+  k_params.template modify<LMPHostType>();
+  k_params.template sync<DeviceType>();
+  d_params = k_params.template view<DeviceType>();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -776,10 +783,6 @@ void PairExp6rxKokkos<DeviceType>::read_file(char *file)
   }
 
   delete [] words;
-
-  k_params.template modify<LMPHostType>();
-  k_params.template sync<DeviceType>();
-  d_params = k_params.template view<DeviceType>();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1095,7 +1098,7 @@ void PairExp6rxKokkos<DeviceType>::polynomialScaling(double phi, double &alpha, 
 
     alpha = (s_coeffAlpha[0]*phi5 + s_coeffAlpha[1]*phi4 + s_coeffAlpha[2]*phi3 + s_coeffAlpha[3]*phi2 + s_coeffAlpha[4]*phi + s_coeffAlpha[5]);
     epsilon *= (s_coeffEps[0]*phi5 + s_coeffEps[1]*phi4 + s_coeffEps[2]*phi3 + s_coeffEps[3]*phi2 + s_coeffEps[4]*phi + s_coeffEps[5]);
-    rm *= (s_coeffEps[0]*phi5 + s_coeffEps[1]*phi4 + s_coeffEps[2]*phi3 + s_coeffEps[3]*phi2 + s_coeffEps[4]*phi + s_coeffEps[5]);
+    rm *= (s_coeffRm[0]*phi5 + s_coeffRm[1]*phi4 + s_coeffRm[2]*phi3 + s_coeffRm[3]*phi2 + s_coeffRm[4]*phi + s_coeffRm[5]);
 }
 
 /* ---------------------------------------------------------------------- */
